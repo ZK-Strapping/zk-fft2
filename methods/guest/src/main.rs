@@ -20,45 +20,6 @@ pub fn main() {
 
 use std::ops::*;
 
-fn fft(coeff: &mut [Complex], invert: bool) {
-    let n = coeff.len();
-
-    let shift = n.leading_zeros() + 1;
-    for i in 0..n {
-        let j = i.reverse_bits() >> shift;
-        if i < j {
-            coeff.swap(i, j);
-        }
-    }
-
-    let mut len = 2;
-
-    while len <= n {
-        let mut ang = std::f64::consts::TAU / len as f64;
-        if invert {
-            ang = -ang;
-        }
-        let w = Complex(ang.cos(), ang.sin());
-        for i in (0..n).step_by(len) {
-            let mut wi = Complex(1., 0.);
-            for j in 0..len / 2 {
-                let even = coeff[i + j];
-                let odd = coeff[i + j + len / 2] * wi;
-                coeff[i + j] = even + odd;
-                coeff[i + j + len / 2] = even - odd;
-                wi = wi * w;
-            }
-        }
-        len <<= 1;
-    }
-    if invert {
-        for coef in coeff {
-            coef.0 /= n as f64;
-            coef.1 /= n as f64;
-        }
-    }
-}
-
 fn is_power_of_two(n: usize) -> bool {
     n != 0 && (n & (n - 1)) == 0
 }
@@ -95,7 +56,7 @@ fn find_mth_root_of_unity(m: usize) -> Complex {
 fn get_psi_powers(m: usize) -> Vec<Complex> {
     let psi = find_mth_root_of_unity(m);
     let mut psi_powers = Vec::with_capacity(m);
-    let mut tmp = Complex(0.0, 0.0);
+    let mut tmp = Complex(1.0, 0.0);
     for i in 0..m {
         psi_powers.push(tmp);
         tmp = tmp * psi;
@@ -191,29 +152,19 @@ fn poly_mul(n: usize, x: &Vec<f64>, m: usize, y: &Vec<f64>) -> Vec<f64> {
     x.resize(len, Complex(0., 0.));
     y.resize(len, Complex(0., 0.));
 
-    let mut xx = special_fft(&mut x, len, len * 2);
-    fft(&mut x, false);
-    let mut yy = special_fft(&mut y, len, len * 2);
-    fft(&mut y, false);
+    let mut xx = special_fft(&mut x, len, len * 4);
+    let mut yy = special_fft(&mut y, len, len * 4);
 
     x.iter_mut().zip(&y).for_each(|(xi, &yi)| *xi = *xi * yi);
     xx.iter_mut().zip(&yy).for_each(|(xxi, &yyi)| *xxi = *xxi * yyi);
 
-    fft(&mut x, true);
-    let mut z = special_ifft(&mut xx, len, len * 2);
+    let mut z = special_ifft(&mut xx, len, len * 4);
 
     for zi in &z {
         println!("{} {}", zi.0, zi.1);
     }
 
-    if cfg!(debug_assertions) {
-        println!("Results of FFT & iFFT:");
-        for xi in &x {
-            println!("{} {}", xi.0, xi.1);
-        }
-    }
-
-    x.iter().map(|xi| corr(xi.0)).collect()
+    z.iter().map(|zi| corr(zi.0)).collect()
 }
 
 #[derive(Clone, Copy, PartialEq)]
